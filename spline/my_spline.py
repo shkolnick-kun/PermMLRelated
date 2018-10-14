@@ -12,7 +12,7 @@ https://ru.wikipedia.org/wiki/%D0%9C%D0%B5%D1%82%D0%BE%D0%B4_%D0%BF%D1%80%D0%BE%
 import numpy as np
 from bisect import bisect_right
 
-
+'''
 def tridiag_solve_out(A, B, C, F):
     n = len(F)
     
@@ -51,7 +51,7 @@ def tridiag_solve_out(A, B, C, F):
     print(beta)
     
     return x
-
+'''
 """
 Solve Mx = F where M is tridiag(A,C,B) inplace
 
@@ -65,12 +65,12 @@ x     -> F
 returns x
 """
 def tridiag_solve_in(A, B, C, F):
-    n = len(F)
+    n = len(C)
     
     if n < 2:
         raise ValueError
     
-    if len(C) != n:
+    if F.shape[0] != n:
         raise ValueError
     
     if len(A) != n - 1:
@@ -199,6 +199,7 @@ x     -> F
 
 returns x
 '''
+'''
 def tridiag_solve_mtx_in(A, B, C, F):
     n = len(C)
     
@@ -229,6 +230,7 @@ def tridiag_solve_mtx_in(A, B, C, F):
         F[i,:] = F[i + 1,:] * C[i] + F[i,:]
     
     return F
+'''
 '''
 A = np.array([1,2,7], dtype='float')
 B = np.array([3,1,1], dtype='float')
@@ -285,7 +287,7 @@ class my_spline_lsq(object):
         self.c[-2,-1] -= h[-1]
         
         tmp = 2.0 * (h[1:] + h[:-1])
-        tridiag_solve_mtx_in(h[1:-1], h[1:-1], tmp, self.c[1:-1])
+        tridiag_solve_in(h[1:-1], h[1:-1], tmp, self.c[1:-1])
         tmp = None
         
         self.b -= h[:,None] * (self.c[1:] + 2.0 * self.c[:-1]) / 3.0
@@ -341,3 +343,4 @@ bs.fit(X,y)
 
 plt.plot(X,y, X,bs.predict(X))
 '''
+
