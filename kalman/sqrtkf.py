@@ -23,11 +23,9 @@ import numpy as np
 """
 Пока тут лежат только линейниые прототипы фильтров Калмана, 
 если будет время/желание - сделаю ОФК и другие алгоритмы.
-
 Currenty there are only linear KF prototypes here,
 if I have more time and will, I'll try to implement 
 EKF and other things. 
-
 Ссылки/References:
 1. Triangular Covariance Factorizations for Kalman Filtering 
    https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19770005172.pdf
@@ -88,9 +86,7 @@ U * diag(D) * U^T = w * diag(d) * w^T
 Params:
 w - is n*k float full rank
 d - is k*k float diag
-
 where k>n
-
 return:
 u - is n*n float upper triangular
 D - id n*n float diag
@@ -136,7 +132,6 @@ F  - n*n transition mtx
 P- = U * diag(D) * U^T state covariance
 B  - p*p pertu_rbation mtx
 Rq = Uq * diag(Dq) * Uq^T - prceess noise covariance
-
 Ratu_rn:
 P+ = U * diag(D) * U^T
 '''
@@ -155,7 +150,6 @@ P- = U * diag(D) * U^T state covariance
 B  - p*p pertu_rbation mtx
 Rq = Uq * diag(Dq) * Uq^T - prceess noise covariance
 b  - transition bias vector
-
 Ratu_rn:
 x+ - predicted state
 P+ = U * diag(D) * U^T predicted state covariance
@@ -176,7 +170,6 @@ x- -             old state mean
 H  - decorrelated observtion mtx
 z  - decorrelated observation
 d_r - decorrelated noise covariance as vector R = u_r * diag(d_r) * u_r^T
-
 return:
 P+ = U * D * U^T new state covariance 
 x+ -             new state mean
@@ -251,7 +244,6 @@ h  - decorrelated observation mtx collumn
 x  - state mean scalar
 e  = z - scalar(H(x)) - scalar error
 r  - decorrelated observtion noise covariance scalar
-
 return: 
 P++ = U * diag(D) * U^T state covariance
 K   - Kalman gain vector
@@ -311,7 +303,6 @@ h  - decorrelated observation mtx collumn
 x  - state mean scalar
 e  = z - scalar(H(x)) - scalar error
 r  - decorrelated observtion noise covariance scalar
-
 return: 
 P++ = U * diag(D) * U^T state covariance
 K   - Kalman gain vector
@@ -327,7 +318,7 @@ def _joseph_scalar_correct(u, d, h, r):
     K = u.dot(v / a)
     
     WW = np.concatenate((np.outer(K,f) - u, K.reshape((n,1))), axis = 1)
-    DD = np.concatenate((d, np.array([a])))
+    DD = np.concatenate((d, np.array([r])))
     
     U,D = mwgs(WW, DD)
     
@@ -404,7 +395,6 @@ z  - decorrelated observation
 d_r - decorrelated noise covariance square root as vector
 psi_func    - influence function
 psidor_func - influence function first derivative
-
 return:
 P+ = U * D * U^T new state covariance 
 x+ -             new state mean
@@ -487,14 +477,12 @@ class _srkf_ra_lin(_srkf_base):
 '''
 Linear robust measurement update internal part 
 for robust and adaptive robust filters
-
 Params:
 P- = U * D * U^T old state covariance
 x- -             old state mean
 H  - decorrelated observtion mtx
 z  - decorrelated observation
 d_r - decorrelated noise covariance as vector R = u_r * diag(d_r) * u_r^T
-
 return:
 K  = Kalman gain vector
 x+ -             new state mean
@@ -538,7 +526,6 @@ x- -             old state mean
 H  - decorrelated observtion mtx
 z  - decorrelated observation
 d_r - decorrelated noise covariance as vector R = u_r * diag(d_r) * u_r^T
-
 return:
 x+ -             new state mean
 P+ = U * D * U^T new state covariance 
@@ -557,87 +544,137 @@ class robust_lin(_srkf_ra_lin):
 #------------------------------------------------------------------------------
 '''
 Linear measurement update for adaptive robust filter [4]
-
 WARNNG: This thing was not properly implemented due to possible typing errors 
 or incomplete information in [4]!!!
-
 Params:
 P- = U * D * U^T old state covariance
 x- -             old state mean
 H  - decorrelated observtion mtx
 z  - decorrelated observation
 d_r - decorrelated noise covariance as vector R = u_r * diag(d_r) * u_r^T
-
 return:
 x+ -             new state mean
 P+ = U * D * U^T new state covariance 
 '''
 
 _mu12 = 1.0 + 3.0*np.sqrt(2) # mu1^2 
-
+"""
 def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
-    x_r,u_r,d_r,k_r,psi_r,psidot_r = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
+    x_j,u_j,d_j,k_j,psi_j,psidot_j = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
     
-    #Innovation
-    nu     = z - h.dot(x_r)
-    
-    #Normalized innovation
+    #Residual
+    nu     = z - h.dot(x_j)
+    #Normalized residual
     beta   = nu / r
-    
     #Influence function
     psi    =    psi_func(beta)
-    psidot = psidot_func(beta)
-    
     #Noise dispersion
     disp  = r * r
-    
-    #weighted innovation
+    #Weighted residual
     eta   = psi * r
     
-    fr = h.dot(u_r)
-    vr = d_r * fr
-    e = fr.dot(vr) + disp
+    f_j = h.dot(u_j)
+    v_j = d_j * f_j
+    e = f_j.dot(v_j) + disp
     
     #Check for filter fail
     dg = eta * eta - e * _mu12
     
-
-    
-    if dg <= 0:
+    if dg < 0:
         # Did not fail, may return robust update result
-        return x_r, u_r, d_r
+        g2 = e
+        U,D = u_j, d_j
+    else:    
+        #Corrected h
+        h_hat = h - h.dot(k_j) * h
+    
+        #Now do adaptive Joseph-like update
+        f = h_hat.dot(u_j)
+        v = d_j * f #f^t used 
 
-    #Filter has failed to converge, now we must do adaptive update
-    #Corrected h
-    h_hat = h - h.dot(k_r) * h
+        #Conmpute gamma^2
+        c = h.dot(u_j.dot(v))
+        b = f.dot(v)
     
-    #Now do adaptive Joseph-like update
-    f = h_hat.dot(u)
-    v = d * f #f^t used 
-
-    
-    #Conmpute gamma^2
-    c = h.dot(u.dot(v))
-    fdv = f.dot(v)
-    g2 = (psidot * (c * c * _mu12 + fdv * dg)) / (dg * disp)
-    
-    #Compute alpha
-    a = g2 * disp - fdv * psidot_r
-    
-    #Comppute Kalman gain
-    K = u_r.dot(v / a)
-    
-    #Compute U D adaptive update
-    n = d_r.shape[0]
-    WW = np.concatenate((u_r, K.reshape((n,1))), axis = 1)
-    DD = np.concatenate((d_r, np.array([a * psidot])))
-    
-    U,D = mwgs(WW, DD)
+        #Filter has failed to converge, now we must do adaptive update
+        g2 = (c * c * _mu12 + b * dg) / dg
+        
+        q = dg / (c * c * _mu12)
+        
+        K = u_j.dot(v)
+        #Compute U D adaptive update
+        n = d_j.shape[0]
+        WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
+        DD = np.concatenate((d_j, np.array([q])))
+        
+        U,D = mwgs(WW, DD)
         
     #Correct state
-    X = x_r + k_r * c * psidot / r * psi_r - K * eta
+    X = x_j - (U.dot(D*U)).dot(h) / g2
     
     return X,U,D
+"""
+def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
+    x_j,u_j,d_j,k_j,psi_j,psidot_j = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
+    
+    #Residual
+    nu     = z - h.dot(x_j)
+    #Normalized residual
+    beta   = nu / r
+    #Influence function
+    psi    =    psi_func(beta)
+    psidot = psidot_func(beta)
+    #Noise dispersion
+    disp  = r * r
+    #Weighted residual
+    eta   = psi * r
+    
+    f_j = h.dot(u_j)
+    v_j = d_j * f_j
+    e = f_j.dot(v_j) + disp
+    
+    #Check for filter fail
+    dg = eta * eta - e * _mu12
+    
+    #Corrected h
+    h_hat = h - h.dot(k_j) * h
+    
+    #Now do adaptive Joseph-like update
+    f = h_hat.dot(u_j)
+    v = d_j * f #f^t used 
+
+    #Conmpute gamma^2
+    c = h.dot(u_j.dot(v))
+    b = f.dot(v)
+    
+    if dg < 0:
+        # Did not fail, may return robust update result
+        g2 = e
+        U,D = u_j, d_j
+    else:    
+        #Filter has failed to converge, now we must do adaptive update
+        g2 = psidot * (c * c * _mu12 + b * dg) / (dg * disp)
+        
+    #Compute alpha
+    #a = g2 * disp - b * psidot_j
+    a = g2 * disp - b * psidot_j
+    #Comppute Kalman gain
+    K = u_j.dot(v / a)
+    
+    if dg >= 0:
+        #Compute U D adaptive update
+        n = d_j.shape[0]
+        WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
+        DD = np.concatenate((d_j, np.array([disp * psidot])))
+        U,D = mwgs(WW, DD)
+        
+    #Correct state
+    #X = x_r - (U.dot(D*U)).dot(h) / g2
+    X = x_j + k_j * c * psidot / r * psi_j - K * eta
+    #X = x_j - K * eta 
+    
+    return X,U,D
+
 #------------------------------------------------------------------------------
 '''
 WARNNG: This thing was not properly implemented due to possible typing errors 
@@ -647,3 +684,103 @@ class adaptive_robust_lin(_srkf_ra_lin):
     
     def __init__(self, x, P, Q, R, psi_func = _srkf_ra_lin._default_psi, psidot_func = _srkf_ra_lin._default_psidot):
         _srkf_ra_lin.__init__(self, x, P, Q, R, psi_func, psidot_func, _correct_adaptive_robust_scalar)
+#------------------------------------------------------------------------------
+'''
+Linear measurement update
+Params:
+P- = U * D * U^T old state covariance
+x- -             old state mean
+H  - decorrelated observtion mtx
+z  - decorrelated observation
+d_r - decorrelated noise covariance as vector R = u_r * diag(d_r) * u_r^T
+return:
+P+ = U * D * U^T new state covariance 
+x+ -             new state mean
+'''
+def _ada_scalar_correct(x, u, d, h, z, r):
+    #Josef update
+    u_j, d_j, K_j = _joseph_scalar_correct(u, d, h, r)
+    
+    #Innovation
+    nu = z - h.dot(x)
+    
+    x_j = x + K_j * nu
+    
+    #residual
+    eta = z - h.dot(x_j)
+    
+    f_j = h.dot(u_j)
+    v_j = d_j * f_j
+    e = f_j.dot(v_j) + r
+    
+    #Check for filter fail
+    dg = eta * eta - e * _mu12
+    
+    if dg >= 0:    
+        #Adaptive correction
+        h_hat = h - h.dot(K_j) * h
+        
+        #
+        f = h_hat.dot(u_j)
+        v = d_j * f #f^t used 
+
+        #Conmpute gamma^2
+        c = h.dot(u_j.dot(v))
+        b = f.dot(v)
+        
+        g2 = (c * c * _mu12 + b * dg) / dg
+        
+        q = dg / (c * c * _mu12)
+        
+        K = u_j.dot(v)
+        
+        #Compute U D adaptive update
+        n = d_j.shape[0]
+        WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
+        DD = np.concatenate((d_j, np.array([q])))
+        
+        U,D = mwgs(WW, DD)
+    else:
+        g2  = e
+        U,D = u_j,d_j
+        
+    X = x_j - (U.dot(D*U)).dot(h) / g2
+        
+    return X,U,D    
+        
+def _ada_correct_lin(x, u, d, H, z, d_r):
+    n = z.shape[0]
+    X = x
+    U = u
+    D = d
+    for i in range(0, n):
+        X,U,D = _ada_scalar_correct(X, U, D, H[i], z[i], d_r[i])
+        
+    return X, U, D
+#------------------------------------------------------------------------------
+'''
+Square root linear kalman filter base class
+'''
+class adaptive_lin(_srkf_base):
+    
+    def __init__(self, x, P, Q, R):   
+        #base init
+        _srkf_base.__init__(self, x, P, Q, R)
+        
+    def run(self, F, B, H, z, bf = None, bh = None):
+        #Constructing default biases
+        if bh is None:
+            bh = np.zeros(z.shape)
+            
+        if bf is None:
+            bf = np.zeros(self.x.shape)
+        #Decorrelate observations    
+        z   = self.dm.dot(z - bh)
+        Hd  = self.dm.dot(H)
+
+        #Time update/Predict
+        self.x, self.U, self.D = _predict_lin(self.x, self.U, self.D, F, bf, B, self.Uq, self.Dq)
+        #Measu_reent update/Correct
+        self.x, self.U, self.D = _ada_correct_lin(self.x, self.U, self.D, Hd, z, self.d_r)
+        #return corrected observation
+        return H.dot(self.x) + bh
