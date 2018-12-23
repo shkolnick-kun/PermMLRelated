@@ -23,8 +23,11 @@ SOFTWARE.
 http://www.machinelearning.ru/wiki/index.php?title=%D0%98%D0%BD%D1%82%D0%B5%D1%80%D0%BF%D0%BE%D0%BB%D1%8F%D1%86%D0%B8%D1%8F_%D0%BA%D1%83%D0%B1%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%BC%D0%B8_%D1%81%D0%BF%D0%BB%D0%B0%D0%B9%D0%BD%D0%B0%D0%BC%D0%B8
 https://ru.wikipedia.org/wiki/%D0%9C%D0%B5%D1%82%D0%BE%D0%B4_%D0%BF%D1%80%D0%BE%D0%B3%D0%BE%D0%BD%D0%BA%D0%B8
 """
-import numpy as np
 from bisect import bisect_right
+import numpy as np
+import numpy.random as rnd
+from my_aco import MyAntColony
+
 """
 Solve Mx = F where M is tridiag(A,C,B) inplace
 
@@ -85,7 +88,7 @@ print(F)
 print(x)
 """
 
-class my_spline(object):
+class MySpline(object):
     
     def __init__(self):
         self.a = None
@@ -151,7 +154,7 @@ while True:
 X_train = X[i[:-1]]
 y_train = y[i[:-1]]
 
-si = my_spline()
+si = MySpline()
 
 si.fit(X_train, y_train)
 
@@ -161,7 +164,7 @@ import matplotlib.pyplot as plt
 
 plt.plot(X,y,X,z)
 '''
-class my_spline_lsq(object):
+class MySplineLSI(object):
     
     def __init__(self, x):
         self.a = None
@@ -244,8 +247,8 @@ import matplotlib.pyplot as plt
 
 X = np.arange(0.0, 10.0, 0.05)
 
-lss = my_spline_lsq(X[::30])
-s = my_spline()
+lss = MySplineLSI(X[::30])
+s = MySpline()
 
 y = np.sin(X)
 
@@ -258,3 +261,81 @@ lssp = lss.predict(X)
 plt.plot(X,y, X,sp, X,lssp)
 plt.plot(X,y-sp, X,y-lssp)
 '''
+
+class MySplineMMLSI(object):
+    def __init__(self, _Q=1.0, _elite=2.0, _a=1.0, _b=1.0, _r=0.005, _N=4, _Ants=20, _epochs=100):
+        self.Q     = _Q
+        self.elite = _elite
+        self.a = _a
+        self.b = _b
+        self.r = _r
+        self.N = _N
+        self.Ants = _Ants
+        self.epochs = _epochs
+        self.spline = None
+        
+    def predict(self, X):
+        if self.spline is not None:
+            return self.spline.predict(X)
+    
+    def fit(self, X, y):
+        n = self.N
+        
+        graph = np.triu(np.ones(len(X)), k=1)
+        
+        def _start_(opt):
+            return rnd.choice(np.nonzero(opt.GW[0])[0])
+            
+        def _stop_(path):
+            #global n
+            #global X
+            if len(path) >= n or path[-1] >= len(X) - 1:
+                return True
+            else:
+                return False
+        
+        def _weigth_(path):
+            #global X
+            try:
+                xs = X[path]
+                s = MySplineLSI(xs)
+                s.fit(X,y)
+                d = s.predict(X) - y
+                rmax = 1.0/(np.max(np.abs(d))) #Minimize max error
+                return rmax
+            except Exception as e:
+                #print(e)
+                return 0.0
+                
+        aco = MyAntColony(graph, self.Q, self.elite, self.a, self.b, self.r,
+                          _start_, _stop_, _weigth_, self.Ants)
+        
+        path,rscore = aco.run(self.epochs)
+        print('The final score is:', 1.0/rscore)
+        
+        self.spline = MySplineLSI(X[path])
+        self.spline.fit(X,y)
+        
+        return self
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    
+    df = pd.read_excel('TunelDiode.xlsx')
+    df.sort_values('U , в', inplace=True)
+    df = df.reset_index(drop=True)
+    
+    X = df['U , в'].values
+    y = df['I , мА'].values
+    n = 4
+    
+    s = MySplineMMLSI(_N=4)
+    s.fit(X,y)
+    
+    xz = np.linspace(X[0], X[-1], len(X)*10)
+    z = s.predict(xz)
+    
+    plt.scatter(X, y)
+    plt.plot(xz, z, color='orange')
+    plt.show()
