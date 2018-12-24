@@ -37,12 +37,14 @@ class MyAnt(object):
         while not self.stop(path):
             i = path[-1]
             segs = np.nonzero(self.P[i])[0]
+            if 0 == len(segs):
+                break
             j = rnd.choice(segs, p=self.P[i][segs])
-            path.append(j)
-            delta_F[i,j] = self.Q
-            
-        w = self.weigth(path)
+            if j not in path:
+                path.append(j)
+                delta_F[i,j] = self.Q
         
+        w = self.weigth(path)
         delta_F *= w
         
         return w, path, delta_F
@@ -52,7 +54,11 @@ class MyAntColony(object):
     def _calc_probabilities(self):
         P = np.power(self.GW, self.b) * np.power(self.F, self.a)
         for i in range(0, P.shape[0]):
-            P[i] /= np.sum(P[i])
+            s = np.sum(P[i])
+            if s > 0:
+                P[i] /= s
+            else:
+                P[i] = 0.0
         return P
         
     def __init__(self, _GW, _Q, elite, _a, _b, _r, start_func, stop_func, weigth_func, AntNum):
@@ -74,8 +80,6 @@ class MyAntColony(object):
         for i in range(0, epochs):
             weigths   = []
             paths     = []
-            self.F *= 1.0 - self.r
-            np.copyto(self.P, self._calc_probabilities())
             #
             for ant in self.ants:
                 #print(ant)
@@ -85,18 +89,23 @@ class MyAntColony(object):
                 paths.append(p)
                 #
                 self.F += dF
+                self.F *= 1.0 - self.r
+                np.copyto(self.P, self._calc_probabilities())
             #Try to find the Elite ant
             e = weigths.index(max(weigths))
             if weigths[e] > elite_w:
                 elite_w = weigths[e]
                 elite_p = paths[e]
             #Elite ant run
-            delta_F = np.zeros(self.P.shape)
-            cur = elite_p[0]
-            for point in elite_p[1:]:
-                delta_F[cur, point] = self.Q * 10
-                cur = point
-            self.F += delta_F * elite_w
+            if 0 != len(elite_p):
+                delta_F = np.zeros(self.P.shape)
+                cur = elite_p[0]
+                for point in elite_p[1:]:
+                    delta_F[cur, point] = self.Q * 10
+                    cur = point
+                self.F += delta_F * elite_w
+                self.F *= 1.0 - self.r
+                np.copyto(self.P, self._calc_probabilities())
             #
             print('Epoch:', i, 'MaxW:', max(weigths), 'ElW', elite_w)
             if target > 0 and elite_w > target:

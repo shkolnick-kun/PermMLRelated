@@ -263,7 +263,7 @@ plt.plot(X,y-sp, X,y-lssp)
 '''
 
 class MySplineMMLSI(object):
-    def __init__(self, _Q=1.0, _elite=2.0, _a=1.0, _b=1.0, _r=0.005, _N=4, _Ants=20, _epochs=100):
+    def __init__(self, _Q=0.001, _elite=50.0, _a=1.0, _b=1.0, _r=0.0005, _N=4, _Ants=10, _epochs=500):
         self.Q     = _Q
         self.elite = _elite
         self.a = _a
@@ -279,17 +279,14 @@ class MySplineMMLSI(object):
             return self.spline.predict(X)
     
     def fit(self, X, y):
-        n = self.N
-        
-        graph = np.triu(np.ones(len(X)), k=1)
+        l = len(X)
+        graph = np.ones((l,l))
         
         def _start_(opt):
             return rnd.choice(np.nonzero(opt.GW[0])[0])
             
         def _stop_(path):
-            #global n
-            #global X
-            if len(path) >= n or path[-1] >= len(X) - 1:
+            if len(path) >= self.N:
                 return True
             else:
                 return False
@@ -297,7 +294,13 @@ class MySplineMMLSI(object):
         def _weigth_(path):
             #global X
             try:
+                path.sort()
                 xs = X[path]
+                
+                for i in range(1, len(path)):
+                    if xs[i] == xs[i-1]:
+                        return 0.0
+                
                 s = MySplineLSI(xs)
                 s.fit(X,y)
                 d = s.predict(X) - y
@@ -321,21 +324,29 @@ class MySplineMMLSI(object):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import pandas as pd
-    
     df = pd.read_excel('TunelDiode.xlsx')
     df.sort_values('U , в', inplace=True)
     df = df.reset_index(drop=True)
     
     X = df['U , в'].values
     y = df['I , мА'].values
-    n = 4
-    
-    s = MySplineMMLSI(_N=4)
+
+    s = MySplineMMLSI(_N=5, _Ants=50, _Q=0.0001, _elite=200.0, _r=0.0001, _epochs=100)
     s.fit(X,y)
     
     xz = np.linspace(X[0], X[-1], len(X)*10)
     z = s.predict(xz)
     
+    xs = s.spline.x
+    ys = s.spline.a
+    print(len(xs))
+    
     plt.scatter(X, y)
+    plt.scatter(xs, ys, color='red', marker='X')
+    plt.plot(xz, z, color='orange')
+    plt.show()
+    
+    plt.scatter(X, y)
+    #plt.scatter(xs, ys, color='red', marker='X')
     plt.plot(xz, z, color='orange')
     plt.show()
