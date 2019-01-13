@@ -43,6 +43,11 @@ EKF and other things.
    ПРАКТИЧЕСКИЕ РЕЗУЛЬТАТЫ / В.Л. БУДКИН, С.Л. БУЛГАКОВ, Ю.П. МИХЕЕНКОВ, 
    А.В. ЧЕРНОДАРОВ, А.П. ПАТРИКЕЕВ // НАУЧНЫЙ ВЕСТНИК МГТУ ГА 
    серия Авионика и электротехника No 89(7) - УДК 629.7.05
+   
+5. Chernodarov A.V., Kovregin V.N. An H ∞ Technology for the Detection and 
+   Damping of Divergent Oscillations in Updatable Inertial Systems 
+   // Proc. of the International Conference “Physics and Control”.– 
+   St.Petersburg, 2003, ed.1, pp. 121-126.
 """
 #------------------------------------------------------------------------------
 '''
@@ -543,7 +548,7 @@ class robust_lin(_srkf_ra_lin):
         _srkf_ra_lin.__init__(self, x, P, Q, R, psi_func, psidot_func, _correct_robust_scalar)
 #------------------------------------------------------------------------------
 '''
-Linear measurement update for adaptive robust filter [4]
+Linear measurement update for adaptive robust filter [4,5]
 WARNNG: This thing was not properly implemented due to possible typing errors 
 or incomplete information in [4]!!!
 Params:
@@ -558,7 +563,7 @@ P+ = U * D * U^T new state covariance
 '''
 
 _mu12 = 1.0 + 3.0*np.sqrt(2) # mu1^2 
-"""
+
 def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     x_j,u_j,d_j,k_j,psi_j,psidot_j = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
     
@@ -613,7 +618,8 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     X = x_j - (U.dot(D*U)).dot(h) / g2
     
     return X,U,D
-"""
+
+'''
 def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     x_j,u_j,d_j,k_j,psi_j,psidot_j = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
     
@@ -674,7 +680,7 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     #X = x_j - K * eta 
     
     return X,U,D
-
+'''
 #------------------------------------------------------------------------------
 '''
 WARNNG: This thing was not properly implemented due to possible typing errors 
@@ -686,7 +692,7 @@ class adaptive_robust_lin(_srkf_ra_lin):
         _srkf_ra_lin.__init__(self, x, P, Q, R, psi_func, psidot_func, _correct_adaptive_robust_scalar)
 #------------------------------------------------------------------------------
 '''
-Linear measurement update
+Linear measurement update for adaptive filter [5]
 Params:
 P- = U * D * U^T old state covariance
 x- -             old state mean
@@ -740,6 +746,8 @@ def _ada_scalar_correct(x, u, d, h, z, r):
         DD = np.concatenate((d_j, np.array([q])))
         
         U,D = mwgs(WW, DD)
+        
+        #g2 = 1.5 * g2
     else:
         g2  = e
         U,D = u_j,d_j
@@ -759,7 +767,7 @@ def _ada_correct_lin(x, u, d, H, z, d_r):
     return X, U, D
 #------------------------------------------------------------------------------
 '''
-Square root linear kalman filter base class
+Adaptive square root Kalman filter [5]
 '''
 class adaptive_lin(_srkf_base):
     

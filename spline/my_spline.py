@@ -331,7 +331,7 @@ if __name__ == "__main__":
     X = df['U , в'].values
     y = df['I , мА'].values
 
-    s = MySplineMMLSI(_N=5, _Ants=50, _Q=0.0001, _elite=200.0, _r=0.0001, _epochs=100)
+    s = MySplineMMLSI(_N=5, _Ants=30, _Q=0.0001, _elite=150.0, _r=0.001, _epochs=200)
     s.fit(X,y)
     
     xz = np.linspace(X[0], X[-1], len(X)*10)
