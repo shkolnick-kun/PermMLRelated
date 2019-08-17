@@ -573,62 +573,6 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     beta   = nu / r
     #Influence function
     psi    =    psi_func(beta)
-    #Noise dispersion
-    disp  = r * r
-    #Weighted residual
-    eta   = psi * r
-    
-    f_j = h.dot(u_j)
-    v_j = d_j * f_j
-    e = f_j.dot(v_j) + disp
-    
-    #Check for filter fail
-    dg = eta * eta - e * _mu12
-    
-    if dg < 0:
-        # Did not fail, may return robust update result
-        g2 = e
-        U,D = u_j, d_j
-    else:    
-        #Corrected h
-        h_hat = h - h.dot(k_j) * h
-    
-        #Now do adaptive Joseph-like update
-        f = h_hat.dot(u_j)
-        v = d_j * f #f^t used 
-
-        #Conmpute gamma^2
-        c = h.dot(u_j.dot(v))
-        b = f.dot(v)
-    
-        #Filter has failed to converge, now we must do adaptive update
-        g2 = (c * c * _mu12 + b * dg) / dg
-        
-        q = dg / (c * c * _mu12)
-        
-        K = u_j.dot(v)
-        #Compute U D adaptive update
-        n = d_j.shape[0]
-        WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
-        DD = np.concatenate((d_j, np.array([q])))
-        
-        U,D = mwgs(WW, DD)
-        
-    #Correct state
-    X = x_j - (U.dot(D*U)).dot(h) / g2
-    
-    return X,U,D
-
-'''
-def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
-    x_j,u_j,d_j,k_j,psi_j,psidot_j = _intra_correct_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func)
-    
-    #Residual
-    nu     = z - h.dot(x_j)
-    #Normalized residual
-    beta   = nu / r
-    #Influence function
-    psi    =    psi_func(beta)
     psidot = psidot_func(beta)
     #Noise dispersion
     disp  = r * r
@@ -642,45 +586,40 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     #Check for filter fail
     dg = eta * eta - e * _mu12
     
-    #Corrected h
-    h_hat = h - h.dot(k_j) * h
-    
-    #Now do adaptive Joseph-like update
-    f = h_hat.dot(u_j)
-    v = d_j * f #f^t used 
-
-    #Conmpute gamma^2
-    c = h.dot(u_j.dot(v))
-    b = f.dot(v)
-    
     if dg < 0:
         # Did not fail, may return robust update result
-        g2 = e
         U,D = u_j, d_j
+        X = x_j
     else:    
         #Filter has failed to converge, now we must do adaptive update
+        #Corrected h
+        h_hat = h - h.dot(k_j) * h
+    
+        #Now do adaptive Joseph-like update
+        f = h_hat.dot(u_j)
+        v = d_j * f #f^t used 
+
+        #Conmpute gamma^2
+        c = h.dot(u_j.dot(v))
+        b = f.dot(v)
+        
         g2 = psidot * (c * c * _mu12 + b * dg) / (dg * disp)
         
-    #Compute alpha
-    #a = g2 * disp - b * psidot_j
-    a = g2 * disp - b * psidot_j
-    #Comppute Kalman gain
-    K = u_j.dot(v / a)
-    
-    if dg >= 0:
+        a = g2 * disp - b * psidot_j
+        
+        K = u_j.dot(v / a)
         #Compute U D adaptive update
         n = d_j.shape[0]
         WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
-        DD = np.concatenate((d_j, np.array([disp * psidot])))
+        DD = np.concatenate((d_j, np.array([a * psidot])))
+        
         U,D = mwgs(WW, DD)
         
-    #Correct state
-    #X = x_r - (U.dot(D*U)).dot(h) / g2
-    X = x_j + k_j * c * psidot / r * psi_j - K * eta
-    #X = x_j - K * eta 
+        #Correct state
+        X = x + (U.dot(D*U)).dot(h) * nu / disp
+        #X = x_j
     
     return X,U,D
-'''
 #------------------------------------------------------------------------------
 '''
 WARNNG: This thing was not properly implemented due to possible typing errors 
@@ -730,11 +669,8 @@ def _ada_scalar_correct(x, u, d, h, z, r):
         f = h_hat.dot(u_j)
         v = d_j * f #f^t used 
 
-        #Conmpute gamma^2
+        #Conmpute q
         c = h.dot(u_j.dot(v))
-        b = f.dot(v)
-        
-        g2 = (c * c * _mu12 + b * dg) / dg
         
         q = dg / (c * c * _mu12)
         
@@ -746,13 +682,10 @@ def _ada_scalar_correct(x, u, d, h, z, r):
         DD = np.concatenate((d_j, np.array([q])))
         
         U,D = mwgs(WW, DD)
-        
-        #g2 = 1.5 * g2
+        X = x + (U.dot(D*U)).dot(h) / r * nu
     else:
-        g2  = e
         U,D = u_j,d_j
-        
-    X = x_j - (U.dot(D*U)).dot(h) / g2
+        X = x_j
         
     return X,U,D    
         
