@@ -616,7 +616,7 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
         U,D = mwgs(WW, DD)
         
         #Correct state
-        X = x + (U.dot(D*U)).dot(h) * nu / disp
+        X = x + (U.dot(D*U)).dot(h) * psi_j / r
         #X = x_j
     
     return X,U,D
