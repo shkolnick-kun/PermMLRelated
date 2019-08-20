@@ -573,7 +573,7 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
     beta   = nu / r
     #Influence function
     psi    =    psi_func(beta)
-    psidot = psidot_func(beta)
+    #psidot = psidot_func(beta)
     #Noise dispersion
     disp  = r * r
     #Weighted residual
@@ -598,20 +598,20 @@ def _correct_adaptive_robust_scalar(x, u, d, h, z, r, psi_func, psidot_func):
         #Now do adaptive Joseph-like update
         f = h_hat.dot(u_j)
         v = d_j * f #f^t used 
+        c = h.dot(u_j.dot(v))
+        q = dg / (c * c * _mu12)
+        K = u_j.dot(v)
 
         #Conmpute gamma^2
-        c = h.dot(u_j.dot(v))
-        b = f.dot(v)
-        
-        g2 = psidot * (c * c * _mu12 + b * dg) / (dg * disp)
-        
-        a = g2 * disp - b * psidot_j
-        
-        K = u_j.dot(v / a)
+        #b = f.dot(v)
+        #g2 = psidot * (c * c * _mu12 + b * dg) / (dg * disp)
+        #a = g2 * disp - b * psidot
+        #K = u_j.dot(v / a)
         #Compute U D adaptive update
         n = d_j.shape[0]
         WW = np.concatenate((u_j, K.reshape((n,1))), axis = 1)
-        DD = np.concatenate((d_j, np.array([a * psidot])))
+        DD = np.concatenate((d_j, np.array([q])))
+        #DD = np.concatenate((d_j, np.array([a * psidot])))
         
         U,D = mwgs(WW, DD)
         
